@@ -6,7 +6,9 @@ import com.example.Joker.s.Event.Event.model.Users;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +19,10 @@ public class AddEventRequest {
     private String description;
     private Long max_Peoples;
     private boolean autoPermit;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private LocalTime startTime;
+    private LocalTime endTime;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private String venue;
     private List<String> ticketType;
     private String invitationUrl;

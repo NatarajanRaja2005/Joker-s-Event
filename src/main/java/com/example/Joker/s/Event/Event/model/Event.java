@@ -8,9 +8,13 @@ import lombok.Setter;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.PrivateKey;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 @Entity
 @Getter
@@ -39,15 +43,17 @@ public class Event {
     private List<Users> peoples;
 
     private boolean autoPermit;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private LocalTime startTime;
+    private LocalTime endTime;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private String venue;
 
     @ElementCollection
     private List<String> ticketType;
 
     @OneToMany(mappedBy = "event",cascade = CascadeType.ALL,orphanRemoval = true)
-    private List<Ticket> tickets=new ArrayList<>();
+    private Queue<Ticket> tickets=new LinkedList<>();
 
     private String invitationUrl;
 }

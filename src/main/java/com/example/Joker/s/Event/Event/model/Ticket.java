@@ -6,6 +6,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.apache.catalina.User;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+
 @Entity
 @Getter
 @Setter
@@ -19,7 +22,13 @@ public class Ticket {
     @JoinColumn(name="event_id")
     private Event event;
 
-    private User user;
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private Users user;
+    private LocalDate bookingDate;
+    private LocalTime bookingTime;
     private String ticketType;
+
     private boolean permitStatus;
+    private boolean cancellation;
 }

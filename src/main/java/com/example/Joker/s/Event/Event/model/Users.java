@@ -28,4 +28,6 @@ public class Users {
 
     @ManyToMany(mappedBy = "peoples")
     private List<Event> attendeesEvent=new ArrayList<>();
+
+    private List<Ticket> tickets=new ArrayList<>();
 }
