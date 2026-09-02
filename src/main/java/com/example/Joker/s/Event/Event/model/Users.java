@@ -29,5 +29,6 @@ public class Users {
     @ManyToMany(mappedBy = "peoples")
     private List<Event> attendeesEvent=new ArrayList<>();
 
+    @OneToMany(mappedBy = "user")
     private List<Ticket> tickets=new ArrayList<>();
 }

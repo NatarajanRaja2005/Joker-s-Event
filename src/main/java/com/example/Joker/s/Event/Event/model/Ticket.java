@@ -31,4 +31,9 @@ public class Ticket {
 
     private boolean permitStatus;
     private boolean cancellation;
+    private LocalDate ticketRaisedDate=LocalDate.now();
+
+    private boolean entry;
+    private LocalDate entryDate;
+    private LocalTime entryTime;
 }

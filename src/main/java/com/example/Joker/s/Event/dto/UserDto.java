@@ -1,12 +1,12 @@
-package com.example.Joker.s.Event.Event.request;
+package com.example.Joker.s.Event.dto;
 
 import lombok.Data;
 
 @Data
-public class AddUserRequest {
+public class UserDto {
+    private Long id;
     private String firstName;
     private String lastName;
     private String email;
-    private String password;
     private String phone;
 }

@@ -53,7 +53,7 @@ public class Event {
     private List<String> ticketType;
 
     @OneToMany(mappedBy = "event",cascade = CascadeType.ALL,orphanRemoval = true)
-    private Queue<Ticket> tickets=new LinkedList<>();
+    private List<Ticket> tickets=new ArrayList<>();
 
     private String invitationUrl;
 }

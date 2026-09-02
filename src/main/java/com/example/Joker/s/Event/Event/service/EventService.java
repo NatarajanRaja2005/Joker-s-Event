@@ -1,22 +1,27 @@
 package com.example.Joker.s.Event.Event.service;
 
+import com.example.Joker.s.Event.Event.dto.EventDto;
 import com.example.Joker.s.Event.Event.enums.EventName;
 import com.example.Joker.s.Event.Event.model.Event;
 import com.example.Joker.s.Event.Event.model.Ticket;
 import com.example.Joker.s.Event.Event.model.Users;
 import com.example.Joker.s.Event.Event.repository.EventRepository;
-import com.example.Joker.s.Event.Event.repository.UserRepository;
+import com.example.Joker.s.Event.Event.repository.TicketRepository;
+import com.example.Joker.s.Event.dto.UserDto;
+import com.example.Joker.s.Event.repository.UserRepository;
 import com.example.Joker.s.Event.Event.request.AddEventRequest;
-import com.example.Joker.s.Event.Exception.EventFullFilledException;
 import com.example.Joker.s.Event.Exception.ItemNotExistsException;
-import com.example.Joker.s.Event.Notification.INotificationService;
+import com.example.Joker.s.Event.Notification.IEventNotificationService;
+import com.example.Joker.s.Event.service.IUserService;
+import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Queue;
 
 @Service
 @RequiredArgsConstructor
@@ -24,9 +29,10 @@ public class EventService implements IEventService{
 
     private final EventRepository eventRepository;
     private final IUserService userService;
-    private final INotificationService notificationService;
+    private final IEventNotificationService notificationService;
     private final UserRepository userRepository;
     private final ITicketService ticketService;
+    private final TicketRepository ticketRepository;
 
     @Override
     public Event createEvent(AddEventRequest request) {
@@ -44,7 +50,8 @@ public class EventService implements IEventService{
         event.setStartTime(request.getStartTime());
         event.setEndTime(request.getEndTime());
         event.setInvitationUrl(request.getInvitationUrl());
-        event.setMax_Peoples(request.getMax_Peoples());
+        System.out.println("People:::: "+request.getMax_peoples()+" \n Auto permit: "+request.isAutoPermit());
+        event.setMax_Peoples(request.getMax_peoples());
         event.setUser(user);
         event.setTicketType(request.getTicketType());
         event.setVenue(request.getVenue());
@@ -52,8 +59,11 @@ public class EventService implements IEventService{
     }
 
     @Override
-    public Event updateEvent(Long eventId,AddEventRequest request) {
+    public Event updateEvent(Long eventId,AddEventRequest request) throws IllegalAccessException {
         Event event=getEventById(eventId);
+        if(event.getUser().getId()!=request.getUserId()){
+            throw new IllegalAccessException("Invalid access");
+        }
         return eventRepository.save(settingEvent(event,request));
     }
 
@@ -71,29 +81,45 @@ public class EventService implements IEventService{
         Event event=getEventById(eventId);
         String message="Welcome to this event...";
         for(String mail:email){
+            System.out.println(message+" "+mail);
             //notificationService.notify(mail,message);
         }
     }
 
+    @Transactional
     @Override
     public void permitPeoples(Long eventId) {
         Event event=getEventById(eventId);
-        if(event.isAutoPermit()){
+        if(!event.isAutoPermit()){
             return;
         }
-        Queue<Ticket> tickets=event.getTickets();
+
+        List<Ticket> tickets=event.getTickets();
         int capacity=event.getPeoples().size();
-        if(capacity>=event.getMax_Peoples()){
-            throw new EventFullFilledException("Maximum Capacity is reached...");
+        Long maxCapacity=event.getMax_Peoples();
+
+        if(tickets==null || tickets.isEmpty()){
+            throw new ItemNotExistsException("Tickets not found: "+eventId);
         }
-        while(!tickets.isEmpty() && capacity<event.getMax_Peoples()){
-            Ticket ticket=tickets.poll();
-            Users user= ticket.getUser();
-            ticket.setPermitStatus(true);
-            event.getPeoples().add(user);
-            user.getAttendeesEvent().add(event);
-            userRepository.save(user);
-            capacity++;
+
+        if(maxCapacity!=null && capacity>=maxCapacity){
+            throw new ItemNotExistsException("Capacity is full!");
+        }
+
+        for(Ticket ticket:tickets){
+            if(maxCapacity!=null && capacity>=maxCapacity){
+                break;
+            }
+            if(!ticket.isPermitStatus()) {
+                //System.out.println("TicketId: "+ticket.getId()+"\nUserName: "+ticket.getUser().getFirstName()+"\nPermit status: "+ticket.isPermitStatus());
+                Users user = ticket.getUser();
+                ticket.setPermitStatus(true);
+                if(user!=null && !event.getPeoples().contains(user)) {
+                    event.getPeoples().add(user);
+                    user.getAttendeesEvent().add(event);
+                    capacity++;
+                }
+            }
         }
         eventRepository.save(event);
     }
@@ -129,7 +155,7 @@ public class EventService implements IEventService{
     @Override
     public void deleteEvent(Long eventId, Long userId) throws IllegalAccessException {
         Event event=getEventById(eventId);
-        if(event.getUser().getId()==userId){
+        if(event.getUser().getId()!=userId){
             throw new IllegalAccessException("Invalid Access Found!");
         }
         eventRepository.delete(event);
@@ -172,7 +198,8 @@ public class EventService implements IEventService{
         LocalDate searchDate=LocalDate.parse(date);
         List<Event> events=user.getAttendeesEvent();
         return events.stream()
-                .filter(event -> searchDate.isAfter(event.getStartDate())&& searchDate.isBefore(event.getEndDate()))
+                .filter(event -> !searchDate.isAfter(event.getEndDate())&&
+                        !searchDate.isBefore(event.getStartDate()))
                 .toList();
     }
 
@@ -182,26 +209,29 @@ public class EventService implements IEventService{
         LocalDate searchDate=LocalDate.parse(date);
         List<Event> events=user.getOrganizedEvents();
         return events.stream()
-                .filter(event -> searchDate.isAfter(event.getStartDate())&& searchDate.isBefore(event.getEndDate()))
+                .filter(event -> !searchDate.isAfter(event.getEndDate())&&
+                        !searchDate.isBefore(event.getStartDate()))
                 .toList();
     }
 
     @Override
-    public List<Ticket> listAllCompletedTickets(Long eventId){
-        Event event=getEventById(eventId);
-        List<Ticket> tickets=event.getTickets().stream().toList();
-        return tickets.stream()
-                .filter(Ticket::isPermitStatus)
-                .toList();
-    }
+    public EventDto eventDto(Event event){
+        EventDto eventDto=new EventDto();
+        eventDto.setId(event.getId());
+        UserDto userDto=userService.userToUserDto(event.getUser());
+        eventDto.setUserDto(userDto);
+        eventDto.setEventName(event.getEventName());
+        eventDto.setDescription(event.getDescription());
+        eventDto.setAutoPermit(event.isAutoPermit());
+        eventDto.setStartDate(event.getStartDate());
+        eventDto.setEndDate(event.getEndDate());
+        eventDto.setStartTime(event.getStartTime());
+        eventDto.setEndTime(event.getEndTime());
+        eventDto.setVenue(event.getVenue());
+        eventDto.setMax_Peoples(event.getMax_Peoples());
+        eventDto.setInvitationUrl(event.getInvitationUrl());
 
-    @Override
-    public List<Ticket> listAllPendingTickets(Long eventId){
-        Event event=getEventById(eventId);
-        List<Ticket> tickets=event.getTickets().stream().toList();
-        return tickets.stream()
-                .filter(ticket->!ticket.isPermitStatus())
-                .toList();
+        return eventDto;
     }
 
 }
